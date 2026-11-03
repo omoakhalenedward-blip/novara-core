@@ -53,6 +53,7 @@ impl GenesisConfig {
 pub enum GenesisError {
     UnsupportedVersion(u32),
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,9 +73,6 @@ mod tests {
 
         let result = GenesisConfig::new(2, network_id);
 
-        assert_eq!(
-            result,
-            Err(GenesisError::UnsupportedVersion(2))
-        );
+        assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
     }
-}
+            }
