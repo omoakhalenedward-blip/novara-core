@@ -207,4 +207,5 @@ mod tests {
 
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
     }
-            }
+}
+            
