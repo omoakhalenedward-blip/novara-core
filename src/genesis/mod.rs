@@ -88,21 +88,20 @@ impl GenesisConfig {
             return Err(GenesisError::InvalidMagic);
         }
 
-        let version = u32::from_be_bytes(
-            bytes[8..12]
+        let version = u32::from_be_bytes(bytes[8..12].try_into().map_err(|_| {
+            GenesisError::InvalidLength {
+                expected: GENESIS_V1_LENGTH,
+                actual: bytes.len(),
+            }
+        })?);
+
+        let network_id_bytes: [u8; NETWORK_ID_LENGTH] =
+            bytes[12..44]
                 .try_into()
                 .map_err(|_| GenesisError::InvalidLength {
                     expected: GENESIS_V1_LENGTH,
                     actual: bytes.len(),
-                })?,
-        );
-
-        let network_id_bytes: [u8; NETWORK_ID_LENGTH] = bytes[12..44]
-            .try_into()
-            .map_err(|_| GenesisError::InvalidLength {
-                expected: GENESIS_V1_LENGTH,
-                actual: bytes.len(),
-            })?;
+                })?;
 
         let network_id = NetworkId::new(network_id_bytes);
 
@@ -115,10 +114,7 @@ impl GenesisConfig {
 pub enum GenesisError {
     UnsupportedVersion(u32),
     InvalidMagic,
-    InvalidLength {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidLength { expected: usize, actual: usize },
 }
 
 #[cfg(test)]
@@ -213,4 +209,4 @@ mod tests {
 
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
     }
-}
+        }
