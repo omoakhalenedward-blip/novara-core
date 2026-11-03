@@ -5,6 +5,7 @@ pub mod network;
 pub mod storage;
 pub mod transaction;
 pub mod types;
+pub mod validator;
 
 // Core library scaffolding for NOVARA.
 // Add actual blockchain logic in these modules later.
