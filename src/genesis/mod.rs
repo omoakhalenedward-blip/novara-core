@@ -18,6 +18,13 @@ impl NetworkId {
         Self(bytes)
     }
 
+    /// Generates a cryptographically secure random Network ID.
+    pub fn generate() -> Result<Self, getrandom::Error> {
+        let mut bytes = [0u8; NETWORK_ID_LENGTH];
+        getrandom::fill(&mut bytes)?;
+        Ok(Self(bytes))
+    }
+
     /// Returns the raw Network ID bytes.
     pub fn as_bytes(&self) -> &[u8; NETWORK_ID_LENGTH] {
         &self.0
@@ -74,5 +81,16 @@ mod tests {
         let result = GenesisConfig::new(2, network_id);
 
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
+    }
+
+    #[test]
+    fn generates_secure_network_id() {
+        let network_id = NetworkId::generate();
+
+        assert!(network_id.is_ok());
+
+        let network_id = network_id.unwrap();
+
+        assert_eq!(network_id.as_bytes().len(), NETWORK_ID_LENGTH);
     }
 }
