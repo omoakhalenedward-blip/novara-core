@@ -9,6 +9,7 @@ use tendermint_proto::v0_38::abci::{
 };
 
 use crate::app::smoke_state::{SMOKE_TRANSACTION, SmokeState, StateSnapshot};
+use crate::genesis::GenesisConfig;
 
 const CODE_OK: u32 = 0;
 const CODE_INVALID_TX: u32 = 1;
@@ -44,10 +45,14 @@ impl Application for NovaraApplication {
     }
 
     fn init_chain(&self, request: RequestInitChain) -> ResponseInitChain {
+        let genesis = GenesisConfig::decode(request.app_state_bytes.as_ref())
+            .expect("invalid NOVARA genesis configuration");
+
         let snapshot = self
             .state
-            .initialize(request.initial_height)
-            .expect("NOVARA smoke application failed to initialize");
+            .initialize(request.initial_height, genesis.network_id)
+            .expect("NOVARA application failed to initialize");
+
         ResponseInitChain {
             consensus_params: None,
             validators: Vec::new(),
@@ -156,4 +161,4 @@ impl Application for NovaraApplication {
             .expect("NOVARA smoke application failed to persist committed state");
         ResponseCommit { retain_height: 0 }
     }
-}
+            }
