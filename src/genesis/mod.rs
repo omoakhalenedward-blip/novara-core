@@ -53,3 +53,28 @@ impl GenesisConfig {
 pub enum GenesisError {
     UnsupportedVersion(u32),
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_supported_genesis_version() {
+        let network_id = NetworkId::new([1u8; NETWORK_ID_LENGTH]);
+
+        let result = GenesisConfig::new(GENESIS_VERSION, network_id);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn rejects_unsupported_genesis_version() {
+        let network_id = NetworkId::new([1u8; NETWORK_ID_LENGTH]);
+
+        let result = GenesisConfig::new(2, network_id);
+
+        assert_eq!(
+            result,
+            Err(GenesisError::UnsupportedVersion(2))
+        );
+    }
+}
