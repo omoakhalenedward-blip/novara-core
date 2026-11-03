@@ -17,7 +17,7 @@ The ADR covers the Rust application and state machine, the proposed CometBFT con
 1. **Independent Layer-1 — CONFIRMED.** NOVARA defines and operates its own chain rules, state, assets, validator set, and application commitments. It is not specified as a token or application deployed on another chain.
 2. **Deterministic state machine — CONFIRMED.** Given the same committed state and ordered block transactions, conforming application nodes must produce the same execution results, validator updates, and application commitment.
 3. **Separation of responsibilities — CONFIRMED.** Unmodified CometBFT initially provides consensus, validator voting, finality, outer block format, and P2P networking. NOVARA's Rust application owns transaction validation, accounts, balances, assets, fees, staking, and deterministic execution.
-4. **Canonical identities — PROPOSED.** Distinguish CometBFT consensus identifiers from NOVARA application identifiers. Never imply that two identifiers are equivalent without specifying and testing identical derivation rules.
+4. **Canonical identities — CONFIRMED direction.** Distinguish CometBFT consensus identifiers from NOVARA application identifiers. Each NOVARA network has an immutable 32-byte Network ID generated once with a cryptographically secure random-number generator when the network is created and stored in application genesis state. Validators receive it through CometBFT `InitChain` and verify its exact length. Transactions and their signatures bind both this Network ID and the CometBFT Chain ID; validators reject mismatches. Wallets must compare the Network ID with trusted network configuration. An independent fork must receive a new Network ID. Copying a genesis file copies its Network ID, so it does not automatically create a distinct replay domain.
 5. **Explicit commitments — PROPOSED.** Application state and proof semantics must be versioned and unambiguous. Committed data must have canonical encodings and documented hash domains.
 6. **Verification without a trusted API — PROPOSED.** Wallets and merchants should eventually be able to verify consensus and application proofs independently using a trusted light-client checkpoint.
 7. **Conservative execution — CONFIRMED.** Sequential deterministic execution is the initial protocol truth. Parallel execution, if considered later, must preserve exactly the sequential result.
@@ -48,17 +48,21 @@ Wallets, merchants, and integrations
        Persistent application state
 ```
 
-The diagram is a target boundary, not a description of currently implemented services. The repository currently contains foundational types and hashing code, but not a functioning consensus integration, execution engine, state tree, staking system, RPC service, or proof service.
+The diagram is a target boundary, not a description of production services. The repository now includes a test-only ABCI++ smoke application and durable counter, but not a production execution engine, state tree, staking system, RPC service, or proof service.
 
-**UNRESOLVED:** Whether the application is embedded in the node process or operated as a separate process, the exact ABCI transport, and the precise RPC and storage deployment model.
+**UNRESOLVED:** Whether the production application is embedded in the node process or operated as a separate process, and the production RPC and storage deployment model. The smoke experiment uses a separate process over the ABCI TCP socket.
 
 ## Consensus architecture
 
 ### Engine and responsibilities
 
-**CONFIRMED direction:** Use unmodified CometBFT initially for consensus, validator voting, finality, outer block format, P2P networking, and block production. The Rust application remains authoritative for NOVARA transaction validation, accounts, balances, assets, fees, staking rules, deterministic execution, and application-defined validator updates. The exact release and Rust ABCI integration must still be validated.
+**CONFIRMED direction:** Use unmodified CometBFT initially for consensus, validator voting, finality, outer block format, P2P networking, and block production. The Rust application remains authoritative for NOVARA transaction validation, accounts, balances, assets, fees, staking rules, deterministic execution, and application-defined validator updates.
 
 CometBFT owns its consensus block structure, header fields, block hash, block identity, transaction-data commitment, and results commitment. ABCI application logic does not add arbitrary fields to the CometBFT header or redefine the engine's block-hash algorithm.
+
+**EXPERIMENTALLY VERIFIED:** A test-only ABCI++ smoke application built with `tendermint-abci = 0.41.0` and `tendermint-proto = 0.41.0` connected to a one-validator CometBFT source build from tag `v0.40.0`. The live test covered the ABCI handshake, `CheckTx`, proposal processing, block execution, durable commit, the H+1 AppHash relationship, and recovery after restart. The binary's embedded Go module metadata identifies `v0.40.0`; its CLI reports `0.39.0` because that tag's fallback `TMCoreSemVer` constant is `0.39.0`.
+
+**COMPATIBILITY LIMIT:** The Rust crate uses generated `v0_38` ABCI messages. The field tags used by the tested lifecycle callbacks matched CometBFT v0.40.0, but its request union does not include v0.40's `RequestInsertTx` and `RequestReapTxs` variants. The experiment therefore explicitly uses `mempool.type = "flood"`; CometBFT's app-mempool mode is not compatible with this adapter.
 
 ### Block identity
 
@@ -70,11 +74,11 @@ CometBFT owns its consensus block structure, header fields, block hash, block id
 
 ### Lifecycle and validator updates
 
-**PROPOSED:** Implement the required ABCI++ lifecycle methods as a thin adapter around deterministic Rust application logic. Proposal preparation, proposal processing, finalization, and commit must follow the selected CometBFT version's requirements and be tested together.
+**PROPOSED:** Implement production ABCI++ lifecycle methods as a thin adapter around deterministic Rust application logic. Proposal preparation, proposal processing, finalization, and commit must follow the selected CometBFT version's requirements and be tested together. The current smoke adapter implements these callbacks only for its single test transaction and is not production transaction logic.
 
 Validator-set changes are application-defined but delivered through CometBFT's validator-update mechanism. The application must model when updates become effective and preserve the historical validator set needed for evidence and accounting. Do not assume that a stake change takes effect immediately.
 
-**UNRESOLVED:** CometBFT release, Rust ABCI library and wire compatibility, use of vote extensions or custom proposal logic, consensus parameters, validator key types, validator update timing in the selected version, and block limits.
+**UNRESOLVED:** Production release and compatibility policy beyond the tested flood-mempool smoke path, use of vote extensions or custom proposal logic, consensus parameters, validator key types, validator update timing in the selected version, and block limits.
 
 ## Transaction architecture
 
@@ -84,7 +88,9 @@ Validator-set changes are application-defined but delivered through CometBFT's v
 
 **CONFIRMED implementation detail:** A 32-byte `TransactionId` type and a NOVARA-domain-separated SHA-256 helper exist. Their exact use in a final transaction format has not been approved.
 
-**UNRESOLVED:** Canonical transaction encoding, transaction-ID input, signature payload, chain/network binding, nonce rules, expiry semantics, fee fields, and compatibility/versioning. This ADR does not prescribe a serialization format or signing scheme.
+**CONFIRMED direction:** Every signed transaction binds the immutable 32-byte NOVARA Network ID as well as the CometBFT Chain ID. The application initializes its Network ID from genesis application state delivered through `InitChain`; the exact value is validated and thereafter immutable for that network.
+
+**UNRESOLVED:** Canonical transaction encoding, transaction-ID input, exact signature preimage/domain literal, application-genesis schema and encoding, secure Network ID generation/distribution operations, nonce rules, expiry semantics, fee fields, and compatibility/versioning. The approved identity requirements do not prescribe all wire-format or operational details.
 
 ### Ordering and execution outcomes
 
@@ -100,7 +106,9 @@ Distinguish block rejection from a transaction that is included but fails execut
 
 **CONFIRMED implementation detail:** The repository has a fixed-size 32-byte `AccountAddress` type. This does not yet define address derivation, account creation, key representation, or authentication behavior.
 
-**UNRESOLVED:** Key algorithms, public-key encoding, signing-byte construction, account creation and derivation, key rotation/recovery, multisignature or threshold policies, and wallet backup model. No authentication algorithm or transaction-signing rule is approved by this ADR.
+**CONFIRMED direction:** Wallets must verify the Network ID against trusted network configuration before signing. Copying the same genesis copies the Network ID; forks intended as independent networks must establish and distribute a new ID.
+
+**UNRESOLVED:** Key algorithms, public-key encoding, exact signing-byte construction, account creation and derivation, key rotation/recovery, multisignature or threshold policies, and wallet backup model. The network-identity binding is approved, but this ADR does not specify the complete transaction-signing format.
 
 ## State and storage architecture
 
