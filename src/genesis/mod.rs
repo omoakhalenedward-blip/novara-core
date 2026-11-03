@@ -124,29 +124,23 @@ mod tests {
     #[test]
     fn accepts_supported_genesis_version() {
         let network_id = NetworkId::new([1u8; NETWORK_ID_LENGTH]);
-
         let result = GenesisConfig::new(GENESIS_VERSION, network_id);
-
         assert!(result.is_ok());
     }
 
     #[test]
     fn rejects_unsupported_genesis_version() {
         let network_id = NetworkId::new([1u8; NETWORK_ID_LENGTH]);
-
         let result = GenesisConfig::new(2, network_id);
-
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
     }
 
     #[test]
     fn generates_secure_network_id() {
         let network_id = NetworkId::generate();
-
         assert!(network_id.is_ok());
 
         let network_id = network_id.unwrap();
-
         assert_eq!(network_id.as_bytes().len(), NETWORK_ID_LENGTH);
     }
 
@@ -193,7 +187,6 @@ mod tests {
         encoded[8..12].copy_from_slice(&GENESIS_VERSION.to_be_bytes());
 
         let result = GenesisConfig::decode(&encoded);
-
         assert_eq!(result, Err(GenesisError::InvalidMagic));
     }
 
@@ -206,7 +199,6 @@ mod tests {
         encoded[8..12].copy_from_slice(&2u32.to_be_bytes());
 
         let result = GenesisConfig::decode(&encoded);
-
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
     }
-        }
+            }
