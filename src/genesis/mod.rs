@@ -198,7 +198,13 @@ mod tests {
         let mut encoded = genesis.encode().unwrap();
         encoded[8..12].copy_from_slice(&2u32.to_be_bytes());
 
-                let result = GenesisConfig::decode(&encoded);
+                    fn rejects_unsupported_encoded_version() {
+        let network_id = NetworkId::new([3u8; NETWORK_ID_LENGTH]);
+        let genesis = GenesisConfig::new(GENESIS_VERSION, network_id).unwrap();
+
+        let mut encoded = genesis.encode().unwrap();
+        encoded[8..12].copy_from_slice(&2u32.to_be_bytes());
+
+        let result = GenesisConfig::decode(&encoded);
         assert_eq!(result, Err(GenesisError::UnsupportedVersion(2)));
-    }
-}
+                    }
