@@ -4,6 +4,7 @@ pub mod app;
 pub mod chain;
 pub mod consensus;
 pub mod crypto;
+pub mod genesis;
 pub mod network;
 pub mod storage;
 pub mod transaction;
